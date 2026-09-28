@@ -1,0 +1,113 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --font-arabic: 'Cairo', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    --font-latin: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  }
+
+  *, *::before, *::after {
+    box-sizing: border-box;
+  }
+
+  html {
+    -webkit-tap-highlight-color: transparent;
+    scroll-behavior: smooth;
+    max-width: 100vw;
+    overflow-x: clip;
+  }
+
+  html[dir="rtl"] {
+    font-family: var(--font-arabic);
+  }
+
+  html[dir="ltr"] {
+    font-family: var(--font-latin);
+  }
+
+  body {
+    min-height: 100vh;
+    width: 100%;
+    max-width: 100vw;
+    overflow-x: clip;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    background-color: #f8fafc;
+    color: #0f172a;
+    position: relative;
+  }
+
+  #root {
+    min-height: 100vh;
+    width: 100%;
+    max-width: 100vw;
+    overflow-x: clip;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* Prevent text, code, titles, and hashes from forcing horizontal scroll */
+  p, h1, h2, h3, h4, h5, h6, span, a, input, textarea, select {
+    overflow-wrap: break-word;
+    word-break: normal;
+  }
+
+  /* Media elements must never exceed viewport */
+  img, svg, video, canvas, audio, iframe, embed, object {
+    max-width: 100%;
+    height: auto;
+  }
+
+  /* Leaflet Map RTL viewport clipping fix */
+  .leaflet-container {
+    width: 100% !important;
+    max-width: 100% !important;
+    direction: ltr !important;
+    overflow: hidden !important;
+  }
+  .leaflet-pane, .leaflet-tile-pane, .leaflet-map-pane {
+    max-width: 100% !important;
+  }
+
+  /* Accessible focus rings */
+  button:focus-visible,
+  a:focus-visible,
+  input:focus-visible,
+  select:focus-visible,
+  textarea:focus-visible {
+    outline: 2px solid #d97706;
+    outline-offset: 2px;
+  }
+}
+
+/* Hide scrollbar utility while preserving touch swipe */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Custom subtle scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.4);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(100, 116, 139, 0.6);
+}
+
+/* Safe area bottom padding for mobile devices */
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom, 16px);
+}
+

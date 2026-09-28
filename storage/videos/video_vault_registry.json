@@ -1,0 +1,20 @@
+{
+  "vid_vault_1790599532556_3fe0d337f393.mp4": {
+    "videoStorageId": "vid_vault_1790599532556_3fe0d337f393.mp4",
+    "originalFileName": "test_crime_video.mp4",
+    "savedFileName": "vid_vault_1790599532556_3fe0d337f393.mp4",
+    "mimeType": "application/octet-stream",
+    "sizeBytes": 27,
+    "sha256": "0812d2e3a3dea79ca2fc355efd151be16a38a6e97a49dcfa9aa47d1b9b49c43c",
+    "bucket": "egypt_public_safety_videos_500mb",
+    "uploadedAt": "2026-09-28T12:45:32.565Z",
+    "isValid": true,
+    "validationDetails": {
+      "formatValid": true,
+      "sizeWithinLimit": true,
+      "integrityVerified": true,
+      "tamperProof": true,
+      "validationTimestamp": "2026-09-28T12:45:32.565Z"
+    }
+  }
+}
