@@ -21,8 +21,6 @@ import {
   FileText,
   ChevronLeft,
   ChevronRight,
-  Shield,
-  HelpCircle,
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { t } from '../locales/i18n';
@@ -71,7 +69,6 @@ export const Navbar: React.FC = () => {
         document.body.style.overflow = originalOverflow;
       };
     } else {
-      // Return focus to menu trigger when closed
       triggerButtonRef.current?.focus();
     }
   }, [mobileMenuOpen]);
@@ -116,7 +113,7 @@ export const Navbar: React.FC = () => {
   const unreadNotifsCount = notifications.filter((n) => !n.read).length;
   const Arrow = isRTL ? ChevronLeft : ChevronRight;
 
-  // Platform navigation directory items (Clean & accessible for citizens)
+  // Platform navigation directory items (Accessible inside the full-screen drawer)
   const navLinks = [
     {
       id: 'home',
@@ -173,28 +170,18 @@ export const Navbar: React.FC = () => {
     },
   ];
 
-  // Header quick links visible on desktop
-  const desktopHeaderLinks = [
-    { id: 'home', label: t('navHome', language) },
-    { id: 'intro', label: isRTL ? 'المقدمة' : 'Intro' },
-    { id: 'goals', label: isRTL ? 'أهداف البرمجية' : 'Goals' },
-    { id: 'user_guide', label: isRTL ? 'دليل الاستخدام' : 'User Guide' },
-    { id: 'track_report', label: t('navTrack', language) },
-    { id: 'safety_center', label: t('navSafety', language) },
-  ];
-
   return (
     <>
       <header className="sticky top-0 z-40 bg-[#091524]/95 text-white border-b border-slate-800/80 shadow-md backdrop-blur-md">
-        {/* Subtle Egyptian Flag Hairline Accent */}
+        {/* Egyptian Flag Hairline Accent */}
         <div className="h-0.5 flex w-full">
           <div className="flex-1 bg-red-600" />
           <div className="flex-1 bg-white" />
           <div className="flex-1 bg-slate-900" />
         </div>
 
-        <div className="max-w-7xl mx-auto px-3 sm:px-6 h-16 flex items-center justify-between gap-2 sm:gap-4 w-full min-w-0">
-          {/* Brand & Crest */}
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 h-16 flex items-center justify-between gap-3 w-full min-w-0">
+          {/* Brand & Crest (Left in LTR, Right in RTL) */}
           <div className="flex items-center gap-2 sm:gap-3 min-w-0 shrink-0">
             <div className="flex items-center gap-2 sm:gap-2.5 text-start group min-w-0">
               <button
@@ -220,55 +207,35 @@ export const Navbar: React.FC = () => {
             </div>
           </div>
 
-          {/* Desktop Navigation Links (Unfolded horizontally in the header bar) */}
-          <nav className="hidden lg:flex items-center gap-1 xl:gap-1.5 min-w-0" aria-label="Desktop Navigation">
-            {desktopHeaderLinks.map((link) => {
-              const isActive = activeView === link.id;
-              return (
-                <button
-                  key={link.id}
-                  type="button"
-                  onClick={() => handleNavClick(link.id)}
-                  className={`px-2.5 xl:px-3 py-1.5 rounded-xl text-xs xl:text-sm font-semibold transition-all cursor-pointer whitespace-nowrap ${
-                    isActive
-                      ? 'bg-amber-500/20 text-amber-300 font-bold border border-amber-500/40 shadow-xs'
-                      : 'text-slate-300 hover:text-white hover:bg-slate-800/80'
-                  }`}
-                >
-                  {link.label}
-                </button>
-              );
-            })}
-          </nav>
-
-          {/* Action Controls & Drawer Trigger */}
-          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+          {/* Action Controls & Menu Trigger (Clean, uncluttered, never overlapping) */}
+          <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
             {/* Direct "Submit Report" CTA button */}
             <button
               type="button"
               onClick={() => handleNavClick('submit_report')}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 sm:px-3.5 sm:py-2 bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 text-slate-950 font-extrabold text-xs rounded-xl shadow-md shadow-amber-500/10 transition-all cursor-pointer active:scale-95"
+              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 sm:px-3 sm:py-1.5 bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 text-slate-950 font-extrabold text-xs rounded-xl shadow-md shadow-amber-500/10 transition-all cursor-pointer active:scale-95 whitespace-nowrap shrink-0"
               title={isRTL ? 'تسجيل بلاغ مدني جديد' : 'Submit Report'}
             >
-              <PlusCircle className="w-3.5 h-3.5 text-slate-950" />
-              <span className="truncate">{isRTL ? 'تسجيل بلاغ +' : 'New Report +'}</span>
+              <PlusCircle className="w-3.5 h-3.5 text-slate-950 shrink-0" />
+              <span className="hidden xs:inline">{isRTL ? 'تسجيل بلاغ +' : 'New Report +'}</span>
+              <span className="xs:hidden font-bold">+</span>
             </button>
 
-            {/* Emergency Hotlines Button */}
+            {/* Emergency Hotlines Button - Concise & Clear */}
             <button
               type="button"
               onClick={() => setEmergencyModalOpen(true)}
               aria-label={t('emergencyHotlinesBtn', language)}
-              className="p-1.5 sm:px-2.5 sm:py-1.5 text-xs font-bold text-rose-300 bg-rose-950/70 hover:bg-rose-900 border border-rose-800/70 rounded-xl transition-colors flex items-center gap-1 cursor-pointer whitespace-nowrap shadow-2xs"
+              className="px-2 py-1.5 sm:px-2.5 sm:py-1.5 text-xs font-bold text-rose-300 bg-rose-950/70 hover:bg-rose-900 border border-rose-800/70 rounded-xl transition-colors flex items-center gap-1 cursor-pointer whitespace-nowrap shadow-2xs shrink-0"
               title={t('emergencyHotlinesBtn', language)}
             >
-              <PhoneCall className="w-3.5 h-3.5 text-rose-400 animate-pulse" />
-              <span className="hidden xl:inline">{t('emergencyHotlinesBtn', language)}</span>
-              <span className="text-[11px] xl:hidden">122/123</span>
+              <PhoneCall className="w-3.5 h-3.5 text-rose-400 animate-pulse shrink-0" />
+              <span className="hidden md:inline">{isRTL ? 'طوارئ 122' : 'Emergency 122'}</span>
+              <span className="md:hidden text-[11px] font-mono">122</span>
             </button>
 
             {/* Notifications Center */}
-            <div className="relative">
+            <div className="relative shrink-0">
               <button
                 type="button"
                 onClick={() => setNotifDropdownOpen(!notifDropdownOpen)}
@@ -349,7 +316,7 @@ export const Navbar: React.FC = () => {
 
             {/* Citizen / Official Authenticated Badge */}
             {isOfficialAuthenticated ? (
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-1 shrink-0">
                 <div
                   onClick={() => {
                     if (currentUser.role === 'admin') {
@@ -369,7 +336,7 @@ export const Navbar: React.FC = () => {
                   ) : (
                     <>
                       <Building className="w-3.5 h-3.5 text-blue-400" />
-                      <span className="truncate max-w-[120px]">
+                      <span className="truncate max-w-[110px]">
                         {currentOfficerBranch?.nameAr || currentUser.branchNameAr || t('loginRoleAuthority', language)}
                       </span>
                     </>
@@ -379,22 +346,21 @@ export const Navbar: React.FC = () => {
                 <button
                   type="button"
                   onClick={logout}
-                  className="p-1.5 sm:px-2.5 sm:py-1.5 text-xs font-semibold text-rose-300 hover:text-white bg-rose-950/70 hover:bg-rose-900 border border-rose-800/80 rounded-xl transition-colors flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
+                  className="p-1.5 sm:px-2 sm:py-1.5 text-xs font-semibold text-rose-300 hover:text-white bg-rose-950/70 hover:bg-rose-900 border border-rose-800/80 rounded-xl transition-colors flex items-center gap-1 cursor-pointer whitespace-nowrap"
                   title={t('logoutBtn', language)}
                 >
                   <LogOut className="w-3.5 h-3.5" />
-                  <span className="hidden sm:inline">{t('logoutBtn', language)}</span>
                 </button>
               </div>
             ) : isCitizenAuthenticated ? (
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-1 shrink-0">
                 <div
                   onClick={() => setActiveView('my_reports')}
-                  className="flex items-center gap-1 px-2 py-1 sm:px-2.5 sm:py-1.5 text-xs font-semibold bg-emerald-500/15 border border-emerald-500/30 rounded-xl text-emerald-300 cursor-pointer hover:bg-emerald-500/20 transition-colors"
+                  className="hidden sm:flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold bg-emerald-500/15 border border-emerald-500/30 rounded-xl text-emerald-300 cursor-pointer hover:bg-emerald-500/20 transition-colors"
                   title={isRTL ? 'حسابك كمواطن ومتابعة بلاغاتك' : 'Your Profile'}
                 >
                   <UserCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                  <span className="truncate max-w-[70px] sm:max-w-[110px]">
+                  <span className="truncate max-w-[90px]">
                     {currentUser.name}
                   </span>
                 </div>
@@ -412,7 +378,7 @@ export const Navbar: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setAuthModalOpen(true)}
-                className="p-1.5 sm:px-2.5 sm:py-1.5 text-xs font-bold text-amber-300 hover:text-slate-950 bg-amber-500/20 hover:bg-amber-400 border border-amber-500/40 rounded-xl transition-all flex items-center gap-1 cursor-pointer whitespace-nowrap shadow-xs"
+                className="px-2 py-1.5 sm:px-2.5 sm:py-1.5 text-xs font-bold text-amber-300 hover:text-slate-950 bg-amber-500/20 hover:bg-amber-400 border border-amber-500/40 rounded-xl transition-all flex items-center gap-1 cursor-pointer whitespace-nowrap shadow-xs shrink-0"
                 title={isRTL ? 'تسجيل دخول المواطنين' : 'Citizen Log In'}
               >
                 <User className="w-3.5 h-3.5" />
@@ -424,60 +390,57 @@ export const Navbar: React.FC = () => {
             <button
               type="button"
               onClick={toggleLanguage}
-              className="px-2 sm:px-2.5 py-1.5 text-xs font-semibold text-slate-200 hover:text-white bg-slate-800/80 hover:bg-slate-700 border border-slate-700/80 rounded-xl transition-colors flex items-center gap-1 cursor-pointer whitespace-nowrap"
+              className="px-2 py-1.5 text-xs font-semibold text-slate-200 hover:text-white bg-slate-800/80 hover:bg-slate-700 border border-slate-700/80 rounded-xl transition-colors flex items-center gap-1 cursor-pointer whitespace-nowrap shrink-0"
               title="تبديل اللغة / Switch Language"
             >
               <Globe className="w-3.5 h-3.5 text-amber-400" />
-              <span className="hidden xs:inline">{isRTL ? 'English' : 'عربي'}</span>
-              <span className="xs:hidden">{isRTL ? 'EN' : 'ع'}</span>
+              <span>{isRTL ? 'EN' : 'ع'}</span>
             </button>
 
             {/* Easy Program Exit Button */}
             <button
               type="button"
               onClick={() => setExitModalOpen(true)}
-              className="p-1.5 sm:px-2.5 sm:py-1.5 text-xs font-bold text-rose-300 hover:text-white bg-rose-950/70 hover:bg-rose-900 border border-rose-800/80 rounded-xl transition-colors flex items-center gap-1 cursor-pointer whitespace-nowrap shadow-2xs"
+              className="p-1.5 sm:p-2 text-xs font-bold text-rose-300 hover:text-white bg-rose-950/70 hover:bg-rose-900 border border-rose-800/80 rounded-xl transition-colors flex items-center cursor-pointer whitespace-nowrap shadow-2xs shrink-0"
               title={isRTL ? 'الخروج من البرمجية بسهولة' : 'Exit Software'}
             >
               <LogOut className="w-3.5 h-3.5 text-rose-400" />
-              <span className="hidden xs:inline">{isRTL ? 'خروج' : 'Exit'}</span>
             </button>
 
-            {/* SLIDE-IN OVERLAY / FULL-SCREEN DRAWER TRIGGER BUTTON */}
+            {/* THE PROMINENT SLIDE-IN DRAWER MENU BUTTON */}
             <button
               ref={triggerButtonRef}
               type="button"
               onClick={() => setMobileMenuOpen((prev) => !prev)}
-              className={`p-2 sm:px-3 sm:py-2 rounded-xl transition-all cursor-pointer flex items-center gap-2 shadow-xs group focus-visible:ring-2 focus-visible:ring-amber-400 ${
+              className={`px-2.5 py-1.5 sm:px-3 sm:py-1.5 rounded-xl transition-all cursor-pointer flex items-center gap-1.5 sm:gap-2 shadow-xs group focus-visible:ring-2 focus-visible:ring-amber-400 whitespace-nowrap shrink-0 ${
                 mobileMenuOpen
-                  ? 'bg-amber-500 text-slate-950 border border-amber-400'
+                  ? 'bg-amber-500 text-slate-950 border border-amber-400 ring-2 ring-amber-400/50'
                   : 'text-amber-400 hover:text-amber-300 bg-slate-800/90 hover:bg-slate-700 border border-amber-500/40'
               }`}
               aria-label={isRTL ? 'فتح القائمة الشاملة' : 'Open platform menu'}
               aria-expanded={mobileMenuOpen}
               aria-controls="main-navigation-drawer"
-              title={isRTL ? 'فتح القائمة الشاملة' : 'Open Navigation Drawer'}
+              title={isRTL ? 'القائمة الشاملة' : 'Main Menu'}
             >
-              {/* Three Lines / Hamburger Icon */}
-              <div className="flex flex-col justify-center items-center gap-1 w-5 h-5 pointer-events-none">
+              <div className="flex flex-col justify-center items-center gap-1 w-4 h-4 sm:w-5 sm:h-5 pointer-events-none">
                 <span
-                  className={`block h-0.5 w-4 rounded-full transition-transform duration-200 ${
+                  className={`block h-0.5 w-3.5 sm:w-4 rounded-full transition-transform duration-200 ${
                     mobileMenuOpen ? 'bg-slate-950 rotate-45 translate-y-1.5' : 'bg-amber-400'
                   }`}
                 />
                 <span
-                  className={`block h-0.5 w-4 rounded-full transition-opacity duration-200 ${
+                  className={`block h-0.5 w-3.5 sm:w-4 rounded-full transition-opacity duration-200 ${
                     mobileMenuOpen ? 'opacity-0' : 'bg-amber-400'
                   }`}
                 />
                 <span
-                  className={`block h-0.5 w-4 rounded-full transition-transform duration-200 ${
+                  className={`block h-0.5 w-3.5 sm:w-4 rounded-full transition-transform duration-200 ${
                     mobileMenuOpen ? 'bg-slate-950 -rotate-45 -translate-y-1.5' : 'bg-amber-400'
                   }`}
                 />
               </div>
               <span
-                className={`text-xs font-extrabold hidden sm:inline ${
+                className={`text-xs font-black ${
                   mobileMenuOpen ? 'text-slate-950' : 'text-white'
                 }`}
               >
