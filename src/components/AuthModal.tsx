@@ -23,6 +23,7 @@ export const AuthModal: React.FC = () => {
   // Citizen form state
   const [citizenName, setCitizenName] = useState<string>('أحمد حسام الدين علي');
   const [citizenPhone, setCitizenPhone] = useState<string>('01012345678');
+  const [citizenNationalId, setCitizenNationalId] = useState<string>('29801011234567');
   const [citizenEmail, setCitizenEmail] = useState<string>('citizen@ainmasr.eg.mock');
 
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -34,6 +35,15 @@ export const AuthModal: React.FC = () => {
   const handleCitizenSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg(null);
+
+    if (!citizenName.trim()) {
+      setErrorMsg(
+        language === 'ar'
+          ? 'يرجى إدخال اسم المواطن.'
+          : 'Please enter your full name.'
+      );
+      return;
+    }
 
     if (!citizenPhone.trim() || citizenPhone.trim().length < 10) {
       setErrorMsg(
@@ -47,11 +57,11 @@ export const AuthModal: React.FC = () => {
     setIsSubmitting(true);
 
     setTimeout(() => {
-      loginAsCitizen(citizenName, citizenPhone, citizenEmail);
+      loginAsCitizen(citizenName, citizenPhone, citizenEmail, citizenNationalId);
       setIsSubmitting(false);
       setSuccessMsg(
         language === 'ar'
-          ? 'تم تسجيل الدخول وتفعيل حسابك كمواطن / مقيم بنجاح'
+          ? 'تم تسجيل الدخول وتوثيق هويتك كمواطن بنجاح — يمكنك الآن تقديم البلاغات'
           : 'Citizen profile verified and logged in successfully'
       );
 
@@ -82,12 +92,12 @@ export const AuthModal: React.FC = () => {
             </div>
             <div>
               <h2 className="text-base font-extrabold text-white">
-                {language === 'ar' ? 'تسجيل دخول المواطنين' : 'Citizen Login'}
+                {language === 'ar' ? 'تسجيل دخول المواطنين (إلزامي لتقديم البلاغات)' : 'Citizen Mandatory Login'}
               </h2>
-              <p className="text-xs text-slate-400">
+              <p className="text-xs text-amber-300 font-semibold">
                 {language === 'ar'
-                  ? 'منصة عين مصر للبلاغات المدنية والسلامة العامة'
-                  : 'Ain Masr Civic & Public Safety System'}
+                  ? 'تسجيل الدخول إلزامي لتوثيق البلاغ وحماية سرية بياناتك'
+                  : 'Mandatory verification to ensure report integrity'}
               </p>
             </div>
           </div>
@@ -102,12 +112,12 @@ export const AuthModal: React.FC = () => {
         </div>
 
         {/* Informative Banner */}
-        <div className="p-3.5 border-b text-xs flex items-start gap-2.5 bg-emerald-50/60 border-emerald-100 text-emerald-950">
-          <Sparkles className="w-4 h-4 shrink-0 mt-0.5 text-emerald-600" />
-          <p className="leading-relaxed">
+        <div className="p-3.5 border-b text-xs flex items-start gap-2.5 bg-amber-50/80 border-amber-200 text-amber-950">
+          <Sparkles className="w-4 h-4 shrink-0 mt-0.5 text-amber-600" />
+          <p className="leading-relaxed font-semibold">
             {language === 'ar'
-              ? 'أهلاً بك في منصة عين مصر. تسجيلك يتيح لك حفظ بلاغاتك وتتبع قرارات اللجان الميدانية خطوة بخطوة مع كامل سرية بياناتك.'
-              : 'Welcome to Ain Masr. Log in to track your reports and receive official responses in real time.'}
+              ? 'تنويه هام: تسجيل الدخول إلزامي لكافة المواطنين بموجب ضوابط السلامة العامة، لإثبات الجدية وحفظ بلاغاتك وتتبع قرارات المعاينة الميدانية بأمان تام.'
+              : 'Important: Citizen login is mandatory under civic public safety regulations to guarantee report authenticity and secure field tracking.'}
           </p>
         </div>
 
@@ -128,35 +138,54 @@ export const AuthModal: React.FC = () => {
           )}
 
           {/* CITIZEN FORM ONLY */}
-          <form onSubmit={handleCitizenSubmit} className="space-y-4">
+          <form onSubmit={handleCitizenSubmit} className="space-y-3.5">
             <div className="space-y-1.5">
               <label className="block text-xs font-bold text-slate-800">
-                {language === 'ar' ? 'الاسم بالكامل (أو الاسم المستعار):' : 'Full Name (or alias):'}
+                {language === 'ar' ? 'اسم المواطن الرباعي / الثلاثي:' : 'Full Name:'} *
               </label>
               <div className="relative">
                 <User className="w-4 h-4 text-slate-400 absolute top-1/2 -translate-y-1/2 left-3 rtl:left-auto rtl:right-3" />
                 <input
                   type="text"
+                  required
                   value={citizenName}
                   onChange={(e) => setCitizenName(e.target.value)}
-                  placeholder={language === 'ar' ? 'مثال: أحمد حسام الدين' : 'e.g. Ahmed Hossam'}
-                  className="w-full pl-9 pr-3.5 rtl:pr-9 rtl:pl-3.5 py-2.5 text-xs bg-slate-50 border border-slate-300 rounded-xl font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  placeholder={language === 'ar' ? 'مثال: أحمد حسام الدين علي' : 'e.g. Ahmed Hossam'}
+                  className="w-full pl-9 pr-3.5 rtl:pr-9 rtl:pl-3.5 py-2.5 text-xs bg-slate-50 border border-slate-300 rounded-xl font-medium focus:outline-none focus:ring-2 focus:ring-amber-500"
                 />
               </div>
             </div>
 
             <div className="space-y-1.5">
               <label className="block text-xs font-bold text-slate-800">
-                {language === 'ar' ? 'رقم الهاتف المحمول للتأكيد:' : 'Mobile Phone Number:'} *
+                {language === 'ar' ? 'رقم الهاتف المحمول للتأكيد الميداني:' : 'Mobile Phone Number:'} *
               </label>
               <div className="relative">
                 <Phone className="w-4 h-4 text-slate-400 absolute top-1/2 -translate-y-1/2 left-3 rtl:left-auto rtl:right-3" />
                 <input
                   type="tel"
+                  required
                   value={citizenPhone}
                   onChange={(e) => setCitizenPhone(e.target.value)}
                   placeholder="01xxxxxxxxx"
-                  className="w-full pl-9 pr-3.5 rtl:pr-9 rtl:pl-3.5 py-2.5 text-xs bg-slate-50 border border-slate-300 rounded-xl font-mono focus:outline-none focus:ring-2 focus:ring-emerald-500 tabular-nums"
+                  className="w-full pl-9 pr-3.5 rtl:pr-9 rtl:pl-3.5 py-2.5 text-xs bg-slate-50 border border-slate-300 rounded-xl font-mono focus:outline-none focus:ring-2 focus:ring-amber-500 tabular-nums"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="block text-xs font-bold text-slate-800">
+                {language === 'ar' ? 'الرقم القومي (14 رقماً للتحقق الرسمي):' : 'National ID (14 digits):'}
+              </label>
+              <div className="relative">
+                <ShieldCheck className="w-4 h-4 text-slate-400 absolute top-1/2 -translate-y-1/2 left-3 rtl:left-auto rtl:right-3" />
+                <input
+                  type="text"
+                  maxLength={14}
+                  value={citizenNationalId}
+                  onChange={(e) => setCitizenNationalId(e.target.value)}
+                  placeholder="29801011234567"
+                  className="w-full pl-9 pr-3.5 rtl:pr-9 rtl:pl-3.5 py-2.5 text-xs bg-slate-50 border border-slate-300 rounded-xl font-mono focus:outline-none focus:ring-2 focus:ring-amber-500 tabular-nums"
                 />
               </div>
             </div>

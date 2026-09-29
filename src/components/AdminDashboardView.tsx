@@ -121,7 +121,7 @@ export const AdminDashboardView: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [govFilter, setGovFilter] = useState<string>('all');
-  const [quickFilter, setQuickFilter] = useState<'all' | 'transferred' | 'with_replies' | 'investigating' | 'resolved' | 'flagged'>('all');
+  const [quickFilter, setQuickFilter] = useState<'all' | 'transferred' | 'with_replies' | 'investigating' | 'resolved' | 'flagged' | 'sensitive_cyber'>('all');
 
   // Fast inline reply state in Replies Tab
   const [quickReplyReportId, setQuickReplyReportId] = useState<string | null>(null);
@@ -458,6 +458,10 @@ export const AdminDashboardView: React.FC = () => {
     .sort((a, b) => new Date(b.updatedAt || b.createdAt).getTime() - new Date(a.updatedAt || a.createdAt).getTime());
   const repliedCount = reportsWithReplies.length;
 
+  const sensitiveCyberCount = reports.filter(
+    (r) => r.categoryId === 'cat_cyber_extortion' || Boolean(r.isSensitive)
+  ).length;
+
   // Filtered reports for Reports tab, sorted by newest activity first
   const filteredReports = [...reports]
     .sort((a, b) => new Date(b.updatedAt || b.createdAt).getTime() - new Date(a.updatedAt || a.createdAt).getTime())
@@ -478,7 +482,9 @@ export const AdminDashboardView: React.FC = () => {
       const matchesGov = govFilter === 'all' ? true : rep.location?.governorateId === govFilter;
 
       let matchesQuick = true;
-      if (quickFilter === 'transferred') {
+      if (quickFilter === 'sensitive_cyber') {
+        matchesQuick = rep.categoryId === 'cat_cyber_extortion' || Boolean(rep.isSensitive);
+      } else if (quickFilter === 'transferred') {
         matchesQuick = isReportTransferred(rep);
       } else if (quickFilter === 'with_replies') {
         matchesQuick = hasReplies(rep);
@@ -904,13 +910,14 @@ export const AdminDashboardView: React.FC = () => {
             </div>
           </div>
 
-          {/* Quick Filter Badges Row (حل مشكلة عزل التحويلات والردود) */}
+          {/* Quick Filter Badges Row */}
           <div className="flex items-center gap-2 overflow-x-auto pb-1 text-xs">
             <span className="text-[11px] text-slate-400 font-bold shrink-0">
               {language === 'ar' ? 'تصنيف سريع:' : 'Quick Filter:'}
             </span>
             {[
               { id: 'all', label: language === 'ar' ? 'كافة البلاغات' : 'All Reports', count: totalReportsCount },
+              { id: 'sensitive_cyber', label: language === 'ar' ? '🚨 بلاغات الابتزاز والتنمر (هيئة الاتصالات)' : '🚨 Cyber Extortion (Telecom)', count: sensitiveCyberCount },
               { id: 'transferred', label: language === 'ar' ? '🔄 المحالة بين الفروع' : '🔄 Branch Transfers', count: transferredCount },
               { id: 'with_replies', label: language === 'ar' ? '💬 بها ردود واستفسارات' : '💬 Active Replies', count: repliedCount },
               { id: 'investigating', label: language === 'ar' ? '🔍 قيد المعاينة الميدانية' : '🔍 Investigating', count: investigatingCount },
@@ -935,6 +942,30 @@ export const AdminDashboardView: React.FC = () => {
                 </span>
               </button>
             ))}
+          </div>
+
+          {/* Admin Media & Privacy Clearance Banner */}
+          <div className="p-3.5 bg-gradient-to-r from-slate-900 via-slate-800 to-amber-950 text-white rounded-2xl flex items-center justify-between gap-3 text-xs border border-amber-500/30 shadow-md">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-xl bg-amber-500 text-slate-950 flex items-center justify-center font-bold shrink-0">
+                <Lock className="w-4 h-4" />
+              </div>
+              <div>
+                <span className="font-extrabold text-amber-300 block">
+                  {language === 'ar'
+                    ? 'صلاحية المشرف العام المركزية: كشف كامل للأدلة الجنائية والمرفقات الحساسة'
+                    : 'Central Admin Clearance: Full Access to Sensitive Photos & Video Vault'}
+                </span>
+                <span className="text-[11px] text-slate-300">
+                  {language === 'ar'
+                    ? 'كافة المرفقات (الصور، الفيديوهات عالية الدقة 500MB، وبصمات SHA-256) معروضة حصرياً لك ومحجوبة عن الفروع الميدانية العادية حمايةً للخصوصية.'
+                    : 'All forensic evidence photos and 500MB videos are fully accessible here and restricted from regular municipal branches.'}
+                </span>
+              </div>
+            </div>
+            <span className="text-[10px] bg-amber-500/20 text-amber-300 px-2.5 py-1 rounded-full border border-amber-400/40 font-mono font-bold shrink-0 hidden sm:inline">
+              {language === 'ar' ? 'معاينة غير مقيدة' : 'Unrestricted Access'}
+            </span>
           </div>
 
           {/* Table */}
@@ -976,8 +1007,14 @@ export const AdminDashboardView: React.FC = () => {
                           )}
                         </div>
                       </td>
-                      <td className="p-3 font-semibold text-slate-900 max-w-xs truncate">
-                        {rep.title}
+                      <td className="p-3 font-semibold text-slate-900 max-w-xs">
+                        <div className="truncate">{rep.title}</div>
+                        {(rep.categoryId === 'cat_cyber_extortion' || Boolean(rep.isSensitive)) && (
+                          <span className="inline-flex items-center gap-1 mt-0.5 px-2 py-0.5 rounded-full text-[9px] font-extrabold bg-purple-100 text-purple-900 border border-purple-300">
+                            <ShieldAlert className="w-2.5 h-2.5 text-rose-600" />
+                            <span>{language === 'ar' ? 'بلاغ حساس (هيئة الاتصالات ومباحث الإنترنت)' : 'Sensitive Cyber (NTRA)'}</span>
+                          </span>
+                        )}
                       </td>
                       <td className="p-3 text-slate-600">
                         {language === 'ar' ? gov?.nameAr : gov?.nameEn}
@@ -2599,6 +2636,16 @@ MONGODB_URI=mongodb+srv://abdobeah916_db_user:Axm6QGnt2hSVkOFg@cluster0.jb69qjk.
                   {/* Attachments & 500MB Video Vault Player */}
                   {inspectModalReport.attachments && inspectModalReport.attachments.length > 0 && (
                     <div className="space-y-2 pt-2">
+                      <div className="p-2.5 bg-amber-500/10 border border-amber-400/40 rounded-xl flex items-center justify-between text-xs text-amber-900">
+                        <span className="font-bold flex items-center gap-1.5">
+                          <Lock className="w-3.5 h-3.5 text-amber-600" />
+                          <span>{language === 'ar' ? 'صلاحية المشرف العام: معاينة كاملة للصور ومقاطع الفيديو المحجوبة عن الفروع العادية' : 'Admin Privilege: Full preview of photos & videos restricted from regular branches'}</span>
+                        </span>
+                        <span className="text-[10px] bg-amber-100 text-amber-950 font-bold px-2 py-0.5 rounded border border-amber-300">
+                          {language === 'ar' ? 'كشف غير مقيد' : 'Unrestricted'}
+                        </span>
+                      </div>
+
                       <h4 className="font-bold text-slate-800 flex items-center justify-between">
                         <span>{language === 'ar' ? 'الأدلة الجنائية والمقاطع المرفقة' : 'Attached Media Evidence'} ({inspectModalReport.attachments.length}):</span>
                         <span className="text-[10px] text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">

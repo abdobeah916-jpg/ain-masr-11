@@ -60,7 +60,7 @@ interface AppContextType {
   setAuthModalOpen: (open: boolean) => void;
   authDefaultTab: 'citizen' | 'official';
   setAuthDefaultTab: (tab: 'citizen' | 'official') => void;
-  loginAsCitizen: (customName?: string, customPhone?: string, customEmail?: string) => void;
+  loginAsCitizen: (customName?: string, customPhone?: string, customEmail?: string, customNationalId?: string) => void;
   loginAsOfficial: (
     roleType: 'admin' | 'authority',
     username: string,
@@ -582,19 +582,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   // Citizen Login
-  const loginAsCitizen = (customName?: string, customPhone?: string, customEmail?: string) => {
+  const loginAsCitizen = (customName?: string, customPhone?: string, customEmail?: string, customNationalId?: string) => {
     const baseUser = MOCK_USERS[0];
     const citizenUser: UserAccount = {
       ...baseUser,
       name: customName?.trim() || baseUser.name,
       phone: customPhone?.trim() || baseUser.phone,
       email: customEmail?.trim() || baseUser.email,
+      nationalId: customNationalId?.trim() || '29801011234567',
       isGuestCitizen: false,
     };
     setCurrentUser(citizenUser);
     setIsCitizenAuthenticated(true);
     setIsOfficialAuthenticated(false);
     localStorage.setItem('ain_masr_citizen_logged', 'true');
+    localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(citizenUser));
     setAuthModalOpen(false);
 
     const now = new Date().toISOString();
@@ -681,6 +683,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (branchId) {
       const b = AUTHORITY_BRANCHES.find((item) => item.id === branchId);
       if (b) matchedBranch = b;
+    } else if (cleanUser.includes('telecom') || cleanUser.includes('cyber') || cleanUser.includes('ntra')) {
+      const b = AUTHORITY_BRANCHES.find((item) => item.id === 'branch_telecom_cyber');
+      if (b) matchedBranch = b;
     } else if (cleanUser.includes('suez')) {
       const b = AUTHORITY_BRANCHES.find((item) => item.id === 'branch_suez_city');
       if (b) matchedBranch = b;
@@ -762,6 +767,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Automated Routing Engine
   const evaluateRouting = (categoryId: string, governorateId: string, severity: Severity): string => {
+    // Dedicated rule for cyber extortion & sensitive cases: ALWAYS route to Telecom Authority & Cybercrime Unit
+    if (categoryId === 'cat_cyber_extortion') {
+      return 'dept_telecom_cyber';
+    }
+
     // Check rules in order of priority (highest priority first)
     const sortedRules = [...routingRules]
       .filter((r) => r.active)
@@ -789,10 +799,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const newId = `rep_${Date.now()}`;
     const now = new Date().toISOString();
 
-    const assignedDeptId = evaluateRouting(
-      newReportData.categoryId,
-      newReportData.location.governorateId,
-      newReportData.severity
+    // Check if this is a confidential sensitive case (cyber extortion, online bullying, or marked sensitive)
+    const isSensitiveCyber = Boolean(
+      newReportData.categoryId === 'cat_cyber_extortion' ||
+      Boolean(newReportData.isSensitive) ||
+      (newReportData.title && /ابتزاز|تنمر|سري|حساس|تشهير|إلكتروني|extortion|cyber|bullying/i.test(newReportData.title)) ||
+      (newReportData.customCategory && /ابتزاز|تنمر|سري|حساس|تشهير|إلكتروني|extortion|cyber|bullying/i.test(newReportData.customCategory)) ||
+      (newReportData.description && /ابتزاز|تنمر|تهديد بنشر صور|تهديد بفيديو/i.test(newReportData.description))
     );
 
     // Calculate Geographically Nearest Competent Authority Branch
@@ -802,6 +815,31 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       newReportData.location.governorateId,
       newReportData.location.cityDistrict
     );
+
+    let assignedDeptId = isSensitiveCyber
+      ? 'dept_telecom_cyber'
+      : evaluateRouting(
+          newReportData.categoryId,
+          newReportData.location.governorateId,
+          newReportData.severity
+        );
+
+    // If sensitive cyber report (extortion, cyberbullying), route EXCLUSIVELY to Egyptian Telecom Authority
+    let finalBranchId = nearestBranchInfo.branch.id;
+    let finalBranchNameAr = nearestBranchInfo.branch.nameAr;
+    let finalBranchNameEn = nearestBranchInfo.branch.nameEn;
+    let finalDistanceKm = nearestBranchInfo.distanceKm;
+
+    if (isSensitiveCyber) {
+      assignedDeptId = 'dept_telecom_cyber';
+      const telecomBranch = AUTHORITY_BRANCHES.find((b) => b.id === 'branch_telecom_cyber');
+      if (telecomBranch) {
+        finalBranchId = telecomBranch.id;
+        finalBranchNameAr = telecomBranch.nameAr;
+        finalBranchNameEn = telecomBranch.nameEn;
+        finalDistanceKm = 0;
+      }
+    }
 
     const isDefamatoryRisk =
       newReportData.description.includes('حرامي') ||
@@ -817,11 +855,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       mongoId,
       referenceNo,
       status: 'submitted',
+      isSensitive: isSensitiveCyber,
       assignedDepartmentId: assignedDeptId,
-      assignedBranchId: nearestBranchInfo.branch.id,
-      assignedBranchNameAr: nearestBranchInfo.branch.nameAr,
-      assignedBranchNameEn: nearestBranchInfo.branch.nameEn,
-      distanceToBranchKm: nearestBranchInfo.distanceKm,
+      assignedBranchId: finalBranchId,
+      assignedBranchNameAr: finalBranchNameAr,
+      assignedBranchNameEn: finalBranchNameEn,
+      distanceToBranchKm: finalDistanceKm,
       moderationStatus: isDefamatoryRisk ? 'flagged' : 'clean',
       moderationNotes: isDefamatoryRisk ? 'نظام التحقق الآلي: اشتباه بعبارات اتهام شخصية تستلزم المراجعة' : undefined,
       internalNotes: [],
@@ -831,8 +870,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           id: `tl_${Date.now()}_1`,
           status: 'submitted',
           timestamp: now,
-          noteAr: 'تم استلام البلاغ وتوليد الرقم المرجعي الموحد وقيده في سجل المعاينة والمتابعة.',
-          noteEn: 'Report received and assigned unique tracking reference for inspection.',
+          noteAr: isSensitiveCyber
+            ? 'تم استلام وتشفير البلاغ الحساس وقيده في السجل الأمني الموحد لمكافحة الابتزاز والجرائم الإلكترونية.'
+            : 'تم استلام البلاغ وتوليد الرقم المرجعي الموحد وقيده في سجل المعاينة والمتابعة.',
+          noteEn: isSensitiveCyber
+            ? 'Sensitive extortion report received, encrypted, and logged into secure cyber-safety records.'
+            : 'Report received and assigned unique tracking reference for inspection.',
           actorRole: 'citizen',
           actorName: newReportData.reporter.fullName || 'مواطن / مقيم',
         },
@@ -840,8 +883,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           id: `tl_${Date.now()}_2`,
           status: 'assigned',
           timestamp: new Date(Date.now() + 1000).toISOString(),
-          noteAr: `تم التوجيه التلقائي للبلاغ إلى أقرب جهة مختصة ميدانية: [${nearestBranchInfo.branch.nameAr}] (على بُعد ${nearestBranchInfo.distanceKm} كم).`,
-          noteEn: `Automatically dispatched to nearest competent authority branch: [${nearestBranchInfo.branch.nameEn}] (${nearestBranchInfo.distanceKm} km away).`,
+          noteAr: isSensitiveCyber
+            ? `تم التوجيه الأمني المشفر والتلقائي للبلاغ الحساس إلى: [الجهاز القومي لتنظيم الاتصالات ومباحث الإنترنت - هيئة الاتصالات المصرية] بسرية تامة وعزل كامل عن أي جهات أو فروع محلية.`
+            : `تم التوجيه التلقائي للبلاغ إلى أقرب جهة مختصة ميدانية: [${finalBranchNameAr}] (على بُعد ${finalDistanceKm} كم).`,
+          noteEn: isSensitiveCyber
+            ? `Automatically dispatched strictly to: [National Telecom Regulatory Authority & Cybercrime Unit] with full confidentiality.`
+            : `Automatically dispatched to nearest competent authority branch: [${finalBranchNameEn}] (${finalDistanceKm} km away).`,
           actorRole: 'system',
           departmentId: assignedDeptId,
         },
@@ -866,7 +913,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       actionEn: `Registered new civic report with ref ${referenceNo}`,
       targetType: 'report',
       targetId: newId,
-      details: `العنوان: ${newReportData.title} — توجيه تلقائي لأقرب جهة: ${nearestBranchInfo.branch.nameAr}`,
+      details: isSensitiveCyber
+        ? `العنوان: ${newReportData.title} — توجيه أمني مشفر وحصري لهيئة الاتصالات المصرية ومباحث الإنترنت (معزول عن الفروع والمحليات)`
+        : `العنوان: ${newReportData.title} — توجيه تلقائي لأقرب جهة: ${finalBranchNameAr}`,
     };
     setAuditLogs((prev) => [newAuditLog, ...prev]);
 
@@ -874,25 +923,41 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const newNotif: AppNotification = {
       id: `notif_${Date.now()}`,
       timestamp: now,
-      titleAr: `تم إرسال وتوجيه بلاغك رقم ${referenceNo}`,
-      titleEn: `Report ${referenceNo} Submitted & Auto-Routed`,
-      messageAr: `تم توجيه البلاغ تلقائياً لأقرب جهة مختصة: ${nearestBranchInfo.branch.nameAr} (${nearestBranchInfo.distanceKm} كم).`,
-      messageEn: `Automatically dispatched to nearest authority: ${nearestBranchInfo.branch.nameEn}.`,
+      titleAr: isSensitiveCyber
+        ? `🚨 تم تشفير وتوجيه البلاغ الحساس رقم ${referenceNo}`
+        : `تم إرسال وتوجيه بلاغك رقم ${referenceNo}`,
+      titleEn: isSensitiveCyber
+        ? `Sensitive Report ${referenceNo} Encrypted & Auto-Routed`
+        : `Report ${referenceNo} Submitted & Auto-Routed`,
+      messageAr: isSensitiveCyber
+        ? `تم توجيه البلاغ الحساس تلقائياً وفورياً إلى: [الجهاز القومي لتنظيم الاتصالات ومباحث الإنترنت - هيئة الاتصالات المصرية] حصرياً وسرياً، ومحجوب تماماً عن أي جهات محلية.`
+        : `تم توجيه البلاغ تلقائياً لأقرب جهة مختصة: ${finalBranchNameAr} (${finalDistanceKm} كم).`,
+      messageEn: isSensitiveCyber
+        ? `Confidential sensitive report routed exclusively to Egyptian Telecom Regulatory Authority & Cybercrime Unit.`
+        : `Automatically dispatched to nearest authority: ${finalBranchNameEn}.`,
       read: false,
       reportRef: referenceNo,
-      branchNameAr: nearestBranchInfo.branch.nameAr,
+      branchNameAr: isSensitiveCyber ? 'هيئة الاتصالات المصرية ومباحث الإنترنت' : finalBranchNameAr,
       type: 'nearest_routing',
     };
     setNotifications((prev) => [newNotif, ...prev]);
 
     // Trigger External Toast ("تظهر من بره")
     triggerExternalToast({
-      titleAr: `📍 توجيه تلقائي للبلاغ ${referenceNo}`,
-      titleEn: `Auto-Routed: ${referenceNo}`,
-      messageAr: `تم توجيه البلاغ تلقائياً لأقرب جهة مختصة: ${nearestBranchInfo.branch.nameAr}`,
-      messageEn: `Dispatched to nearest branch: ${nearestBranchInfo.branch.nameEn}`,
+      titleAr: isSensitiveCyber
+        ? `🚨 توجيه حصري للبلاغ الحساس ${referenceNo}`
+        : `📍 توجيه تلقائي للبلاغ ${referenceNo}`,
+      titleEn: isSensitiveCyber
+        ? `Confidential Cyber Report: ${referenceNo}`
+        : `Auto-Routed: ${referenceNo}`,
+      messageAr: isSensitiveCyber
+        ? `تم توجيه البلاغ الحساس تلقائياً وفورياً إلى: هيئة الاتصالات المصرية ومباحث الإنترنت (محجوب تماماً عن الفروع المحلية)`
+        : `تم توجيه البلاغ تلقائياً لأقرب جهة مختصة: ${finalBranchNameAr}`,
+      messageEn: isSensitiveCyber
+        ? `Dispatched strictly to Egyptian Telecom Authority & Cybercrime Unit.`
+        : `Dispatched to nearest branch: ${finalBranchNameEn}`,
       reportRef: referenceNo,
-      branchNameAr: nearestBranchInfo.branch.nameAr,
+      branchNameAr: isSensitiveCyber ? 'هيئة الاتصالات المصرية ومباحث الإنترنت' : finalBranchNameAr,
       type: 'nearest_routing',
     });
 

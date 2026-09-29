@@ -97,8 +97,12 @@ export const TrackReportView: React.FC = () => {
     setRatingSubmitted(true);
   };
 
+  const isSensitiveCyber = Boolean(activeReport?.isSensitive || activeReport?.categoryId === 'cat_cyber_extortion');
+
   const assignedDept = activeReport
-    ? departments.find((d) => d.id === activeReport.assignedDepartmentId)
+    ? isSensitiveCyber
+      ? (departments.find((d) => d.id === 'dept_telecom_cyber') || departments.find((d) => d.id === activeReport.assignedDepartmentId))
+      : departments.find((d) => d.id === activeReport.assignedDepartmentId)
     : null;
 
   const currentCat = activeReport
@@ -250,24 +254,33 @@ export const TrackReportView: React.FC = () => {
 
             {/* Assigned Department Info */}
             {assignedDept && (
-              <div className="p-4 bg-blue-50/60 border border-blue-200/70 rounded-xl text-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+              <div className={`p-4 rounded-xl text-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border ${
+                isSensitiveCyber
+                  ? 'bg-gradient-to-r from-purple-950 via-slate-900 to-indigo-950 text-white border-purple-500 shadow-md'
+                  : 'bg-blue-50/60 border-blue-200/70'
+              }`}>
                 <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg bg-blue-100 text-blue-700 shrink-0">
+                  <div className={`p-2 rounded-lg shrink-0 ${isSensitiveCyber ? 'bg-purple-800 text-amber-300' : 'bg-blue-100 text-blue-700'}`}>
                     <Building className="w-5 h-5" />
                   </div>
                   <div>
-                    <span className="text-slate-500 block">
-                      {t('department', language)}:
+                    <span className={`block text-[11px] ${isSensitiveCyber ? 'text-purple-300' : 'text-slate-500'}`}>
+                      {language === 'ar' ? 'الجهة الرسمية الموجه إليها البلاغ الحصري:' : t('department', language)}
                     </span>
-                    <span className="font-bold text-slate-900 text-sm">
+                    <span className={`font-bold text-sm ${isSensitiveCyber ? 'text-white' : 'text-slate-900'}`}>
                       {language === 'ar' ? assignedDept.nameAr : assignedDept.nameEn}
                     </span>
+                    {isSensitiveCyber && (
+                      <span className="block text-[10px] text-amber-300 font-semibold mt-0.5">
+                        {language === 'ar' ? '🔒 محجوب ومعزول تماماً عن الفروع والمحليات العادية' : '🔒 Isolated from local municipal branches'}
+                      </span>
+                    )}
                   </div>
                 </div>
 
-                <div className="flex items-center gap-3 text-slate-600">
+                <div className={`flex items-center gap-3 ${isSensitiveCyber ? 'text-purple-200' : 'text-slate-600'}`}>
                   <div className="flex items-center gap-1 font-mono tabular-nums">
-                    <Phone className="w-3.5 h-3.5 text-blue-600" />
+                    <Phone className={`w-3.5 h-3.5 ${isSensitiveCyber ? 'text-amber-400' : 'text-blue-600'}`} />
                     <span>{assignedDept.hotline}</span>
                   </div>
                 </div>

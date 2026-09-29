@@ -26,7 +26,10 @@ export const ReportReceiptModal: React.FC<ReportReceiptModalProps> = ({ report, 
 
   if (!report) return null;
 
-  const assignedDept = departments.find((d) => d.id === report.assignedDepartmentId);
+  const isSensitiveCyber = report.isSensitive || report.categoryId === 'cat_cyber_extortion';
+  const assignedDept = isSensitiveCyber
+    ? (departments.find((d) => d.id === 'dept_telecom_cyber') || departments.find((d) => d.id === report.assignedDepartmentId))
+    : departments.find((d) => d.id === report.assignedDepartmentId);
   const currentCat = categories.find((c) => c.id === report.categoryId);
   const gov = GOVERNORATES.find((g) => g.id === report.location.governorateId);
 
@@ -186,24 +189,33 @@ export const ReportReceiptModal: React.FC<ReportReceiptModalProps> = ({ report, 
           </div>
 
           {/* Department Dispatch Info */}
-          <div className="p-3.5 bg-blue-50/60 border border-blue-200 rounded-xl flex items-center justify-between text-xs">
+          <div className={`p-3.5 rounded-xl border flex items-center justify-between text-xs ${
+            isSensitiveCyber ? 'bg-purple-950 text-white border-purple-500 shadow-sm' : 'bg-blue-50/60 border-blue-200'
+          }`}>
             <div className="flex items-center gap-2">
-              <Building className="w-4 h-4 text-blue-700" />
+              <Building className={`w-4 h-4 ${isSensitiveCyber ? 'text-amber-400' : 'text-blue-700'}`} />
               <div>
-                <span className="text-slate-500 block text-[11px]">
+                <span className={`block text-[11px] ${isSensitiveCyber ? 'text-purple-200' : 'text-slate-500'}`}>
                   {language === 'ar' ? 'الجهة الحكومية الموجه إليها البلاغ:' : 'Assigned Government Department:'}
                 </span>
-                <span className="font-bold text-blue-900">
-                  {language === 'ar' ? assignedDept?.nameAr : assignedDept?.nameEn}
+                <span className={`font-bold ${isSensitiveCyber ? 'text-white' : 'text-blue-900'}`}>
+                  {isSensitiveCyber
+                    ? (language === 'ar' ? 'الجهاز القومي لتنظيم الاتصالات ومباحث الإنترنت (هيئة الاتصالات المصرية)' : 'National Telecom Regulatory Authority & Cybercrime Unit')
+                    : (language === 'ar' ? assignedDept?.nameAr : assignedDept?.nameEn)}
                 </span>
+                {isSensitiveCyber && (
+                  <span className="block text-[10px] text-amber-300 font-semibold mt-0.5">
+                    {language === 'ar' ? '🔒 توجيه أمني مشفر وحصري (محجوب تماماً عن أي جهات محلية)' : '🔒 Exclusively routed and isolated from local branches'}
+                  </span>
+                )}
               </div>
             </div>
 
             <div className="text-end">
-              <span className="text-[10px] text-slate-500 block">
+              <span className={`text-[10px] block ${isSensitiveCyber ? 'text-purple-300' : 'text-slate-500'}`}>
                 {language === 'ar' ? 'نوع قيد الهوية:' : 'Identity Protocol:'}
               </span>
-              <span className="font-bold text-slate-800">
+              <span className={`font-bold ${isSensitiveCyber ? 'text-amber-300' : 'text-slate-800'}`}>
                 {report.reporter.identityType === 'verified'
                   ? (language === 'ar' ? 'مواطن موثق' : 'Verified Citizen')
                   : (language === 'ar' ? 'هوية محمية وسرية' : 'Protected Identity')}

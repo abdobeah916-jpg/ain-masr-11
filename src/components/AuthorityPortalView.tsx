@@ -32,6 +32,7 @@ import {
   FileCheck,
   ShieldCheck,
   Play,
+  PhoneCall,
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { t, formatStatus, formatSeverity } from '../locales/i18n';
@@ -135,7 +136,7 @@ export const AuthorityPortalView: React.FC = () => {
               </span>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
               <button
                 type="button"
                 onClick={() => loginAsOfficial('authority', 'arbaeen.officer', 'pass2026', 'branch_suez_arbaeen')}
@@ -143,10 +144,10 @@ export const AuthorityPortalView: React.FC = () => {
               >
                 <div className="text-xs font-extrabold flex items-center gap-1.5">
                   <Building className="w-3.5 h-3.5 text-amber-300" />
-                  <span>{language === 'ar' ? 'جهة الأربعين (السويس)' : 'Al-Arbaeen Branch (Suez)'}</span>
+                  <span>{language === 'ar' ? 'جهة الأربعين' : 'Al-Arbaeen Branch'}</span>
                 </div>
                 <div className="text-[10px] text-blue-200 mt-0.5">
-                  {language === 'ar' ? 'مفتش الأربعين (arbaeen.officer)' : 'Arbaeen Inspector (arbaeen.officer)'}
+                  {language === 'ar' ? 'مفتش الأربعين' : 'Arbaeen Inspector'}
                 </div>
               </button>
 
@@ -160,7 +161,21 @@ export const AuthorityPortalView: React.FC = () => {
                   <span>{language === 'ar' ? 'جهة السويس المركزية' : 'Suez Central Authority'}</span>
                 </div>
                 <div className="text-[10px] text-slate-300 mt-0.5">
-                  {language === 'ar' ? 'مفتش السويس (suez.officer)' : 'Suez Inspector (suez.officer)'}
+                  {language === 'ar' ? 'مفتش السويس' : 'Suez Inspector'}
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => loginAsOfficial('authority', 'telecom.officer', 'pass2026', 'branch_telecom_cyber')}
+                className="p-3 bg-purple-900 hover:bg-purple-800 text-white rounded-xl text-start shadow transition-all cursor-pointer border border-purple-500/40"
+              >
+                <div className="text-xs font-extrabold flex items-center gap-1.5 text-purple-200">
+                  <ShieldCheck className="w-3.5 h-3.5 text-rose-400" />
+                  <span>{language === 'ar' ? 'هيئة الاتصالات' : 'Telecom Authority'}</span>
+                </div>
+                <div className="text-[10px] text-purple-300 mt-0.5 truncate">
+                  {language === 'ar' ? 'مباحث الإنترنت والابتزاز' : 'Cybercrime & Extortion'}
                 </div>
               </button>
             </div>
@@ -251,9 +266,32 @@ export const AuthorityPortalView: React.FC = () => {
   const activeBranch = currentOfficerBranch || branches[0];
 
   // Helper: Can my branch see this report?
-  // Strict rule: Only if assigned to my branch (nearest location), OR shared with network, OR explicitly shared with my branch ID, OR user is system admin.
+  // Strict rule: Sensitive cyber extortion reports go EXCLUSIVELY to Telecom Authority (branch_telecom_cyber).
+  // Regular reports are isolated to nearest branch unless shared.
   const canMyBranchSeeReport = (report: Report) => {
     if (currentUser.role === 'admin') return true;
+
+    const isSensitiveCyber =
+      report.categoryId === 'cat_cyber_extortion' || Boolean(report.isSensitive);
+
+    // If it's a sensitive cyber extortion/bullying report, ONLY Telecom Authority can see it
+    if (isSensitiveCyber) {
+      return (
+        activeBranch.id === 'branch_telecom_cyber' ||
+        currentUser.branchId === 'branch_telecom_cyber' ||
+        currentUser.departmentId === 'dept_telecom_cyber'
+      );
+    }
+
+    // Telecom Authority only sees cyber/telecom cases
+    if (activeBranch.id === 'branch_telecom_cyber') {
+      return (
+        report.assignedBranchId === 'branch_telecom_cyber' ||
+        report.categoryId === 'cat_cybercrime' ||
+        report.categoryId === 'cat_cyber_extortion'
+      );
+    }
+
     if (report.assignedBranchId === activeBranch.id) return true;
     if (report.isSharedWithNetwork === true) return true;
     if (report.sharedWithBranchIds && report.sharedWithBranchIds.includes(activeBranch.id)) return true;
@@ -1185,54 +1223,147 @@ export const AuthorityPortalView: React.FC = () => {
                 {language === 'en' && selectedCase.descriptionEn ? selectedCase.descriptionEn : selectedCase.description}
               </div>
 
-              {/* Attachments & Dedicated Video Vault Evidence */}
+              {/* Citizen Contact & Field Location Details (Visible to Authority) */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3.5 bg-blue-50/80 border border-blue-200 rounded-xl text-xs">
+                {/* Citizen Information */}
+                <div className="space-y-1.5">
+                  <div className="font-extrabold text-blue-950 flex items-center gap-1.5">
+                    <User className="w-3.5 h-3.5 text-blue-700" />
+                    <span>{language === 'ar' ? 'بيانات المواطن المبلّغ:' : 'Reporter Details:'}</span>
+                  </div>
+                  <div className="text-slate-800 font-bold">
+                    {selectedCase.reporter?.fullName || (language === 'ar' ? 'مواطن / مقيم' : 'Citizen')}
+                  </div>
+                  {selectedCase.reporter?.phone && (
+                    <div className="flex items-center gap-2 pt-0.5">
+                      <span className="text-[11px] text-slate-500">{language === 'ar' ? 'رقم الهاتف:' : 'Phone:'}</span>
+                      <a
+                        href={`tel:${selectedCase.reporter.phone}`}
+                        className="font-mono font-extrabold text-emerald-800 hover:text-emerald-950 bg-emerald-100/80 px-2 py-0.5 rounded border border-emerald-300 flex items-center gap-1"
+                        dir="ltr"
+                      >
+                        <PhoneCall className="w-3 h-3 text-emerald-600" />
+                        <span>{selectedCase.reporter.phone}</span>
+                      </a>
+                    </div>
+                  )}
+                  {selectedCase.reporter?.identityType && (
+                    <div className="text-[10px] text-slate-600">
+                      {language === 'ar' ? 'نوع الهوية: ' : 'Identity: '}
+                      <span className="font-semibold text-blue-900">
+                        {selectedCase.reporter.identityType === 'verified'
+                          ? language === 'ar' ? 'هوية موثقة' : 'Verified'
+                          : language === 'ar' ? 'هوية محمية' : 'Protected'}
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Field Location */}
+                <div className="space-y-1.5 border-t sm:border-t-0 sm:border-r border-blue-200/80 sm:pr-3">
+                  <div className="font-extrabold text-blue-950 flex items-center gap-1.5">
+                    <MapPin className="w-3.5 h-3.5 text-blue-700" />
+                    <span>{language === 'ar' ? 'الموقع الجغرافي للمعاينة الميدانية:' : 'Field Inspection Location:'}</span>
+                  </div>
+                  <div className="text-slate-800 font-bold">
+                    {selectedCase.location?.cityDistrict || (language === 'ar' ? 'نطاق جغرافي عام' : 'General Area')}
+                    {selectedCase.location?.streetLandmark ? ` — ${selectedCase.location.streetLandmark}` : ''}
+                  </div>
+                  <div className="text-[11px] text-slate-600 font-mono flex items-center gap-1">
+                    <span>GPS:</span>
+                    <span className="bg-white/80 px-1.5 py-0.5 rounded border border-blue-200">
+                      {selectedCase.location?.lat.toFixed(4)}, {selectedCase.location?.lng.toFixed(4)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Attachments Privacy Shield / Admin-Only Access */}
               {selectedCase.attachments && selectedCase.attachments.length > 0 && (
                 <div className="space-y-2">
                   <div className="flex items-center justify-between border-b border-slate-200 pb-1">
-                    <h4 className="font-bold text-slate-900">
-                      {language === 'ar' ? 'الأدلة والمقاطع التوثيقية المرفقة' : 'Evidence & Documentation'} ({selectedCase.attachments.length})
+                    <h4 className="font-bold text-slate-900 flex items-center gap-1.5">
+                      <Lock className="w-3.5 h-3.5 text-amber-600" />
+                      <span>{language === 'ar' ? 'الأدلة والمرفقات التوثيقية' : 'Evidence & Documentation'}</span>
+                      <span className="text-xs text-slate-500 font-normal">({selectedCase.attachments.length})</span>
                     </h4>
-                    <span className="text-[10px] text-amber-700 font-bold bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
-                      {language === 'ar' ? 'مخزن الفيديوهات المخصص 500MB' : 'Dedicated Video Vault (500MB)'}
+                    <span className="text-[10px] text-amber-800 font-bold bg-amber-50 px-2 py-0.5 rounded border border-amber-300">
+                      {language === 'ar' ? 'الخزنة الجنائية المشفرة (500MB)' : 'Encrypted Video Vault'}
                     </span>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {selectedCase.attachments.map((att) => (
-                      <div key={att.id} className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
-                        <div className="flex items-center gap-2 truncate">
-                          {att.type === 'video' ? (
-                            <Film className="w-4 h-4 text-amber-600 shrink-0" />
-                          ) : (
-                            <FileCheck className="w-4 h-4 text-emerald-600 shrink-0" />
-                          )}
-                          <span className="truncate font-bold text-slate-900">{att.name}</span>
-                        </div>
-
-                        {att.type === 'video' && (
-                          <div className="space-y-1.5">
-                            <div className="rounded-lg overflow-hidden bg-black aspect-video flex items-center justify-center">
-                              <video
-                                src={att.videoStorageId ? `/api/videos/stream/${att.videoStorageId}` : att.url}
-                                controls
-                                className="w-full h-full object-cover"
-                              />
-                            </div>
-                            <div className="flex items-center justify-between text-[10px] text-slate-500 font-mono">
-                              <span className="text-emerald-700 font-bold">
-                                {language === 'ar' ? '✓ تدفق HTTP 206 مباشر' : '✓ Live HTTP 206 Stream'}
-                              </span>
-                              <span className="truncate max-w-[120px]">{att.videoStorageId || 'vid_vault'}</span>
-                            </div>
+                  {currentUser.role === 'admin' ? (
+                    /* Admin has full access to photos & videos */
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {selectedCase.attachments.map((att) => (
+                        <div key={att.id} className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
+                          <div className="flex items-center gap-2 truncate">
+                            {att.type === 'video' ? (
+                              <Film className="w-4 h-4 text-amber-600 shrink-0" />
+                            ) : (
+                              <FileCheck className="w-4 h-4 text-emerald-600 shrink-0" />
+                            )}
+                            <span className="truncate font-bold text-slate-900">{att.name}</span>
                           </div>
-                        )}
 
-                        {att.type === 'image' && (
-                          <img src={att.url} alt={att.name} className="w-full h-28 object-cover rounded-lg" />
-                        )}
+                          {att.type === 'video' && (
+                            <div className="space-y-1.5">
+                              <div className="rounded-lg overflow-hidden bg-black aspect-video flex items-center justify-center">
+                                <video
+                                  src={att.videoStorageId ? `/api/videos/stream/${att.videoStorageId}` : att.url}
+                                  controls
+                                  className="w-full h-full object-cover"
+                                />
+                              </div>
+                              <div className="flex items-center justify-between text-[10px] text-slate-500 font-mono">
+                                <span className="text-emerald-700 font-bold">
+                                  {language === 'ar' ? '✓ تدفق HTTP 206 مباشر' : '✓ Live HTTP 206 Stream'}
+                                </span>
+                                <span className="truncate max-w-[120px]">{att.videoStorageId || 'vid_vault'}</span>
+                              </div>
+                            </div>
+                          )}
+
+                          {att.type === 'image' && (
+                            <img src={att.url} alt={att.name} className="w-full h-28 object-cover rounded-lg" />
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    /* Regular Authority Branch: Privacy Shield protects sensitive media */
+                    <div className="p-4 bg-gradient-to-br from-amber-50/80 via-slate-50 to-amber-100/50 border border-amber-300/80 rounded-2xl space-y-2 text-start">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2 text-amber-950 font-extrabold text-xs">
+                          <Lock className="w-4 h-4 text-amber-600 shrink-0" />
+                          <span>{language === 'ar' ? '🔒 المرفقات الحساسة (الصور والفيديوهات) محمية ببروتوكول الخصوصية' : '🔒 Sensitive Photos & Videos Protected'}</span>
+                        </div>
+                        <span className="text-[10px] bg-amber-200/80 text-amber-900 font-bold px-2 py-0.5 rounded border border-amber-300">
+                          {language === 'ar' ? 'صلاحية الأدمن بانل فقط' : 'Admin Panel Only'}
+                        </span>
                       </div>
-                    ))}
-                  </div>
+
+                      <p className="text-xs text-slate-700 leading-relaxed">
+                        {language === 'ar'
+                          ? `يحتوي هذا البلاغ على عدد (${selectedCase.attachments.length}) من الأدلة المرفقة (صور/فيديوهات). حمايةً لحرمة الحياة الخاصة للمواطنين ومنع تداول الصور الشخصية بين الفروع الميدانية، تكون المعاينة الكاملة للصور ومقاطع الفيديو التوثيقية متاحة حصرياً للمشرف العام عبر لوحة التحكم المركزية (الأدمن بانل).`
+                          : `This case contains (${selectedCase.attachments.length}) sensitive photo/video attachments. Under privacy regulations, media preview is strictly limited to the Central Admin Panel.`}
+                      </p>
+
+                      <div className="pt-2 border-t border-amber-200/70 flex flex-wrap items-center justify-between gap-2 text-[11px] text-amber-900">
+                        <div className="flex items-center gap-1.5 font-medium">
+                          <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+                          <span>{language === 'ar' ? 'الأدلة الجنائية محفوظة ومؤمنة في الخزنة المركزية المشفرة' : 'Forensic chain-of-custody preserved in secure vault'}</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setActiveView('admin_dashboard')}
+                          className="px-2.5 py-1 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-lg transition-colors cursor-pointer text-[10px]"
+                        >
+                          {language === 'ar' ? 'فتح لوحة المشرف العام (الأدمن)' : 'Open Admin Panel'}
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 

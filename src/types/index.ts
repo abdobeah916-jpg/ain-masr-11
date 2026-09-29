@@ -35,6 +35,7 @@ export interface ReportCategory {
   descriptionEn: string;
   defaultDepartmentId: string;
   isEmergencyRisk: boolean;
+  isSensitive?: boolean; // Dedicated confidential flag (e.g. cyber extortion / bullying)
   active: boolean;
   order: number;
 }
@@ -114,6 +115,7 @@ export interface Report {
   title: string;
   titleEn?: string;
   categoryId: string;
+  isSensitive?: boolean; // Dedicated confidential flag for cyber extortion & bullying
   customCategory?: string; // Citizen-defined category / type of incident
   customCategoryEn?: string;
   mongoId?: string; // MongoDB _id (24-hex ObjectId)
@@ -218,6 +220,7 @@ export interface UserAccount {
   role: UserRole;
   phone: string;
   email: string;
+  nationalId?: string;
   username?: string;
   password?: string;
   departmentId?: string;

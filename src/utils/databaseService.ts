@@ -69,7 +69,7 @@ export interface VideoValidationResult {
 }
 
 const DEFAULT_DB_CONFIG: DatabaseConfig = {
-  mongoUri: 'mongodb+srv://abdobeah916_db_user:Axm6QGnt2hSVkOFg@cluster0.jb69qjk.mongodb.net/?appName=Cluster0',
+  mongoUri: '',
   mongoDbName: 'ain_masr_civic',
   mongoCollection: 'civic_reports',
   videoDbEndpoint: '/api/videos/stream',

@@ -150,11 +150,11 @@ function calculateFileSha256(filePath: string): Promise<string> {
 // 2. MONGODB DATABASE SERVICE ("مونجو")
 // ============================================================================
 
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://abdobeah916_db_user:Axm6QGnt2hSVkOFg@cluster0.jb69qjk.mongodb.net/?appName=Cluster0';
+const MONGODB_URI = process.env.MONGODB_URI || '';
 const MONGODB_DB_NAME = process.env.MONGODB_DB_NAME || 'ain_masr_civic';
 const MONGODB_COLLECTION = process.env.MONGODB_COLLECTION || 'civic_reports';
 const MONGODB_CONNECT_TIMEOUT_MS = parseInt(
-  process.env.MONGODB_CONNECT_TIMEOUT_MS || '4000',
+  process.env.MONGODB_CONNECT_TIMEOUT_MS || '2500',
   10
 );
 
@@ -196,6 +196,13 @@ function saveFallbackReports(reports: any[]) {
  * Initialize connection to MongoDB
  */
 async function initMongoDB(): Promise<boolean> {
+  if (!MONGODB_URI) {
+    mongoConnected = false;
+    mongoLastError = 'MONGODB_URI not configured. Local fallback store is active.';
+    console.log('[MongoDB] Notice: No MONGODB_URI configured. Local persistent JSON database store is active.');
+    return false;
+  }
+
   try {
     console.log(`[MongoDB] Connecting to MongoDB: ${maskMongoUri(MONGODB_URI)} ...`);
     mongoClient = new MongoClient(MONGODB_URI, {
@@ -540,7 +547,7 @@ app.get('/api/supabase/sign-upload', async (req: Request, res: Response) => {
 app.post(
   '/api/videos/upload',
   (req, res, next) => {
-    videoUpload.single('file')(req, res, (err) => {
+    (videoUpload.single('file') as any)(req, res, (err: any) => {
       if (err instanceof multer.MulterError) {
         if (err.code === 'LIMIT_FILE_SIZE') {
           return res.status(413).json({
@@ -558,15 +565,16 @@ app.post(
   },
   async (req: Request, res: Response) => {
     try {
-      if (!req.file) {
+      const file = (req as any).file;
+      if (!file) {
         return res.status(400).json({ success: false, error: 'No video file uploaded' });
       }
 
-      const filePath = req.file.path;
-      const originalName = req.file.originalname;
-      const mimeType = req.file.mimetype || 'video/mp4';
-      const sizeBytes = req.file.size;
-      const videoStorageId = req.file.filename; // e.g. vid_vault_123456_abc.mp4
+      const filePath = file.path;
+      const originalName = file.originalname;
+      const mimeType = file.mimetype || 'video/mp4';
+      const sizeBytes = file.size;
+      const videoStorageId = file.filename; // e.g. vid_vault_123456_abc.mp4
 
       // Real SHA-256 cryptographic checksum calculation for chain-of-custody evidence validation
       const sha256 = await calculateFileSha256(filePath);
@@ -797,6 +805,26 @@ app.get('/api/videos/list', (_req: Request, res: Response) => {
     bucket: VIDEO_BUCKET_NAME,
     videos: Object.values(registry),
   });
+});
+
+// Database offline / network error handling middleware
+app.use((err: any, req: Request, res: Response, next: express.NextFunction) => {
+  if (
+    err &&
+    (err.name === 'MongoError' ||
+      err.name === 'MongoNetworkError' ||
+      err.name === 'MongooseError' ||
+      (err.message && err.message.includes('buffering timed out')) ||
+      (err.message && err.message.includes('ECONNREFUSED')) ||
+      (err.message && err.message.includes('ETIMEDOUT')))
+  ) {
+    console.warn('[AI Studio] Database offline or network timeout — returning graceful fallback');
+    if (req.method === 'GET') {
+      return res.json(req.path.endsWith('s') || req.path.endsWith('s/') ? [] : {});
+    }
+    return res.status(503).json({ error: 'Service temporarily unavailable (database offline)' });
+  }
+  next(err);
 });
 
 // ============================================================================

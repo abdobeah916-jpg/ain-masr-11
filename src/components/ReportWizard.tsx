@@ -47,6 +47,9 @@ import {
   Search,
   FilePlus,
   Building,
+  ShieldCheck,
+  User,
+  Phone,
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { t, formatSeverity } from '../locales/i18n';
@@ -66,6 +69,10 @@ export const ReportWizard: React.FC = () => {
     setSelectedReportId,
     setEmergencyModalOpen,
     loginAsOfficial,
+    loginAsCitizen,
+    isCitizenAuthenticated,
+    isOfficialAuthenticated,
+    currentUser,
     reportDraft,
     saveReportDraft,
     clearReportDraft,
@@ -78,6 +85,12 @@ export const ReportWizard: React.FC = () => {
   const [step, setStep] = useState<number>(1);
   const [successReport, setSuccessReport] = useState<any>(null);
   const [copiedRef, setCopiedRef] = useState(false);
+
+  // Mandatory Citizen Gate State
+  const [gateCitizenName, setGateCitizenName] = useState('أحمد حسام الدين علي');
+  const [gateCitizenPhone, setGateCitizenPhone] = useState('01012345678');
+  const [gateCitizenNationalId, setGateCitizenNationalId] = useState('29801011234567');
+  const [gateError, setGateError] = useState<string | null>(null);
 
   // Form State
   const [categoryId, setCategoryId] = useState<string>('cat_traffic');
@@ -119,6 +132,31 @@ export const ReportWizard: React.FC = () => {
   const [legalOathAgreed, setLegalOathAgreed] = useState<boolean>(false);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [formErrors, setFormErrors] = useState<{ [key: string]: string }>({});
+
+  // Auto-sync reporter info from authenticated user
+  useEffect(() => {
+    if ((isCitizenAuthenticated || isOfficialAuthenticated) && currentUser) {
+      if (!fullName && currentUser.name) setFullName(currentUser.name);
+      if (!phone && currentUser.phone) setPhone(currentUser.phone);
+      if (!email && currentUser.email) setEmail(currentUser.email);
+    }
+  }, [isCitizenAuthenticated, isOfficialAuthenticated, currentUser]);
+
+  const handleGateCitizenLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    setGateError(null);
+    if (!gateCitizenName.trim()) {
+      setGateError(language === 'ar' ? 'يرجى إدخال اسم المواطن' : 'Please enter citizen name');
+      return;
+    }
+    if (!gateCitizenPhone.trim() || gateCitizenPhone.trim().length < 10) {
+      setGateError(language === 'ar' ? 'يرجى إدخال رقم هاتف محمول مصري صحيح (11 رقماً)' : 'Please enter valid 11-digit phone number');
+      return;
+    }
+    loginAsCitizen(gateCitizenName, gateCitizenPhone, undefined, gateCitizenNationalId);
+    setFullName(gateCitizenName);
+    setPhone(gateCitizenPhone);
+  };
 
   // Restore draft if available
   useEffect(() => {
@@ -403,10 +441,21 @@ export const ReportWizard: React.FC = () => {
     setIsSubmitting(true);
 
     setTimeout(() => {
+      const isSensitiveCase = Boolean(
+        categoryId === 'cat_cyber_extortion' ||
+        (customCategory && /ابتزاز|تنمر|سري|حساس/i.test(customCategory)) ||
+        (title && /ابتزاز|تنمر|سري|حساس/i.test(title)) ||
+        (description && /ابتزاز|تنمر/i.test(description))
+      );
+
+      const finalCatId = isSensitiveCase ? 'cat_cyber_extortion' : categoryId;
+      const finalTitle = title.trim() || customCategory.trim() || (isSensitiveCase ? (language === 'ar' ? 'بلاغ حساس: ابتزاز وتنمر إلكتروني' : 'Sensitive Cyber Complaint') : (language === 'ar' ? 'بلاغ مدني' : 'Civic Incident Report'));
+
       const created = submitNewReport({
-        title: title.trim() || customCategory.trim() || (language === 'ar' ? 'بلاغ مدني' : 'Civic Incident Report'),
-        categoryId,
-        customCategory: customCategory.trim() || undefined,
+        title: finalTitle,
+        categoryId: finalCatId,
+        isSensitive: isSensitiveCase,
+        customCategory: customCategory.trim() || (isSensitiveCase ? (language === 'ar' ? 'ابتزاز إلكتروني وتنمر رقمي' : 'Cyber Extortion') : undefined),
         dateOccurred,
         timeOccurred,
         isOngoing,
@@ -426,9 +475,10 @@ export const ReportWizard: React.FC = () => {
         attachments,
         reporter: {
           identityType,
-          fullName: identityType === 'verified' ? fullName : undefined,
-          phone: identityType === 'verified' ? phone : (phone ? phone.slice(0, 4) + '***' : undefined),
-          email: identityType === 'verified' ? email : undefined,
+          fullName: identityType === 'verified' ? (fullName || currentUser?.name) : undefined,
+          phone: identityType === 'verified' ? (phone || currentUser?.phone) : (phone ? phone.slice(0, 4) + '***' : undefined),
+          email: identityType === 'verified' ? (email || currentUser?.email) : undefined,
+          nationalIdLast4: currentUser?.nationalId ? currentUser.nationalId.slice(-4) : undefined,
           preferredContact,
         },
       });
@@ -567,18 +617,35 @@ export const ReportWizard: React.FC = () => {
                 </div>
               </div>
 
-              <div className="space-y-1">
-                <span className="text-slate-400 font-semibold block">
-                  {language === 'ar' ? 'الجهة الموجه إليها:' : 'Dispatched Authority:'}
-                </span>
-                <div className="flex items-center gap-1.5 font-bold text-slate-900">
-                  <Building className="w-4 h-4 text-blue-600 shrink-0" />
-                  <span>{language === 'ar' ? assignedDept?.nameAr : assignedDept?.nameEn}</span>
+              {successReport.isSensitive || successReport.categoryId === 'cat_cyber_extortion' ? (
+                <div className="space-y-1.5 p-3.5 bg-gradient-to-br from-purple-950 via-slate-900 to-indigo-950 text-white rounded-2xl border border-purple-500 shadow-md">
+                  <div className="flex items-center gap-1.5 font-extrabold text-amber-300 text-xs">
+                    <ShieldCheck className="w-4 h-4 text-rose-400" />
+                    <span>{language === 'ar' ? '🔒 جهة التوجيه الحصري (بلاغ حساس ومحمي):' : '🔒 Exclusive Authority Dispatch (Confidential):'}</span>
+                  </div>
+                  <div className="text-white font-extrabold text-xs sm:text-sm">
+                    {language === 'ar' ? 'الجهاز القومي لتنظيم الاتصالات ومباحث الإنترنت (هيئة الاتصالات المصرية)' : 'National Telecom Regulatory Authority & Cyber Investigation'}
+                  </div>
+                  <p className="text-[11px] text-purple-200 leading-relaxed">
+                    {language === 'ar'
+                      ? '✓ تم تشفير البلاغ وعزله كلياً عن أي فروع أو محليات (مثل السويس أو غيرها). البلاغ موجه حصرياً ومباشرةً لغرفة عمليات هيئة الاتصالات ومباحث الإنترنت.'
+                      : '✓ Case strictly isolated from regular branches. Routed exclusively to Telecom Authority & Cybercrime Headquarters.'}
+                  </p>
                 </div>
-                <div className="text-slate-600 text-[11px]">
-                  {(language === 'ar' ? successReport.assignedBranchNameAr : successReport.assignedBranchNameEn) || (language === 'ar' ? 'فرع الاستجابة الميدانية الأقرب' : 'Nearest Field Dispatch Unit')}
+              ) : (
+                <div className="space-y-1">
+                  <span className="text-slate-400 font-semibold block">
+                    {language === 'ar' ? 'الجهة الموجه إليها:' : 'Dispatched Authority:'}
+                  </span>
+                  <div className="flex items-center gap-1.5 font-bold text-slate-900">
+                    <Building className="w-4 h-4 text-blue-600 shrink-0" />
+                    <span>{language === 'ar' ? assignedDept?.nameAr : assignedDept?.nameEn}</span>
+                  </div>
+                  <div className="text-slate-600 text-[11px]">
+                    {(language === 'ar' ? successReport.assignedBranchNameAr : successReport.assignedBranchNameEn) || (language === 'ar' ? 'فرع الاستجابة الميدانية الأقرب' : 'Nearest Field Dispatch Unit')}
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
 
             {/* Evidence & Media attachments */}
@@ -661,6 +728,126 @@ export const ReportWizard: React.FC = () => {
             >
               <FilePlus className="w-4 h-4 text-slate-600" />
               <span>{language === 'ar' ? 'تقديم بلاغ جديد' : 'New Report'}</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Mandatory Citizen Authentication Gate (تسجيل الدخول للمواطنين إلزامي)
+  if (!isCitizenAuthenticated && !isOfficialAuthenticated) {
+    return (
+      <div className="w-full max-w-xl mx-auto px-3.5 sm:px-6 py-8 sm:py-12 animate-in fade-in space-y-6">
+        <div className="bg-white rounded-3xl border border-slate-200/90 shadow-xl overflow-hidden p-6 sm:p-8 space-y-6 text-start">
+          {/* Header */}
+          <div className="flex items-center gap-3.5 border-b border-slate-100 pb-5">
+            <div className="w-12 h-12 rounded-2xl bg-amber-500 text-slate-950 flex items-center justify-center font-bold shadow-md shadow-amber-500/20 shrink-0">
+              <ShieldCheck className="w-7 h-7" />
+            </div>
+            <div>
+              <div className="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-rose-100 text-rose-800 border border-rose-200 mb-1">
+                {language === 'ar' ? 'إجراء أمني إلزامي' : 'Mandatory Security Step'}
+              </div>
+              <h2 className="text-lg sm:text-xl font-extrabold text-slate-900">
+                {language === 'ar' ? 'تسجيل الدخول إلزامي لتقديم البلاغات' : 'Citizen Login Required'}
+              </h2>
+              <p className="text-xs text-slate-500 mt-0.5">
+                {language === 'ar' ? 'منصة عين مصر للبلاغات المدنية والسلامة العامة' : 'Ain Masr Civic Safety Platform'}
+              </p>
+            </div>
+          </div>
+
+          <div className="p-4 bg-amber-50/80 border border-amber-200 rounded-2xl text-xs space-y-1.5 text-amber-950 font-semibold leading-relaxed">
+            <p>
+              {language === 'ar'
+                ? 'وفقاً لضوابط السلامة العامة وقانون مكافحة الشائعات والجريمة الإلكترونية رقم 175 لسنة 2018، يلزم تسجيل الدخول بالرقم القومي والاسم ورقم الهاتف لإثبات الجدية وحفظ البلاغ في حسابك ومتابعة المعاينة الميدانية بأمان وسرية تامة.'
+                : 'Under Egyptian Law No. 175 of 2018, citizen verification is mandatory to eliminate malicious claims and securely link report tracking to your profile.'}
+            </p>
+          </div>
+
+          {gateError && (
+            <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs font-semibold text-rose-700 flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 shrink-0" />
+              <span>{gateError}</span>
+            </div>
+          )}
+
+          <form onSubmit={handleGateCitizenLogin} className="space-y-4">
+            <div className="space-y-1.5">
+              <label className="block text-xs font-bold text-slate-800">
+                {language === 'ar' ? 'اسم المواطن الرباعي / الثلاثي:' : 'Full Name:'} *
+              </label>
+              <div className="relative">
+                <User className="w-4 h-4 text-slate-400 absolute top-1/2 -translate-y-1/2 left-3 rtl:left-auto rtl:right-3" />
+                <input
+                  type="text"
+                  required
+                  value={gateCitizenName}
+                  onChange={(e) => setGateCitizenName(e.target.value)}
+                  placeholder={language === 'ar' ? 'مثال: أحمد حسام الدين علي' : 'e.g. Ahmed Hossam'}
+                  className="w-full pl-9 pr-3.5 rtl:pr-9 rtl:pl-3.5 py-2.5 text-xs sm:text-sm bg-slate-50 border border-slate-300 rounded-xl font-medium focus:outline-none focus:ring-2 focus:ring-amber-500"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="block text-xs font-bold text-slate-800">
+                {language === 'ar' ? 'رقم الهاتف المحمول للتأكيد الميداني:' : 'Mobile Phone Number:'} *
+              </label>
+              <div className="relative">
+                <Phone className="w-4 h-4 text-slate-400 absolute top-1/2 -translate-y-1/2 left-3 rtl:left-auto rtl:right-3" />
+                <input
+                  type="tel"
+                  required
+                  value={gateCitizenPhone}
+                  onChange={(e) => setGateCitizenPhone(e.target.value)}
+                  placeholder="01xxxxxxxxx"
+                  className="w-full pl-9 pr-3.5 rtl:pr-9 rtl:pl-3.5 py-2.5 text-xs sm:text-sm bg-slate-50 border border-slate-300 rounded-xl font-mono focus:outline-none focus:ring-2 focus:ring-amber-500 tabular-nums"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="block text-xs font-bold text-slate-800">
+                {language === 'ar' ? 'الرقم القومي (14 رقماً للتحقق الرسمي):' : 'National ID (14 digits):'} *
+              </label>
+              <div className="relative">
+                <ShieldCheck className="w-4 h-4 text-slate-400 absolute top-1/2 -translate-y-1/2 left-3 rtl:left-auto rtl:right-3" />
+                <input
+                  type="text"
+                  maxLength={14}
+                  required
+                  value={gateCitizenNationalId}
+                  onChange={(e) => setGateCitizenNationalId(e.target.value)}
+                  placeholder="29801011234567"
+                  className="w-full pl-9 pr-3.5 rtl:pr-9 rtl:pl-3.5 py-2.5 text-xs sm:text-sm bg-slate-50 border border-slate-300 rounded-xl font-mono focus:outline-none focus:ring-2 focus:ring-amber-500 tabular-nums"
+                />
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              className="w-full py-3.5 px-4 bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 text-slate-950 font-extrabold text-xs sm:text-sm rounded-xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95"
+            >
+              <Lock className="w-4 h-4" />
+              <span>{language === 'ar' ? 'تسجيل الدخول والمتابعة لتقديم البلاغ' : 'Verify & Continue to Report'}</span>
+            </button>
+          </form>
+
+          {/* Quick Demo Pre-fill */}
+          <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+            <span>{language === 'ar' ? 'حساب تجريبي للتجربة السريعة:' : 'Demo test profile:'}</span>
+            <button
+              type="button"
+              onClick={() => {
+                loginAsCitizen('أحمد حسام الدين علي', '01012345678', undefined, '29801011234567');
+                setFullName('أحمد حسام الدين علي');
+                setPhone('01012345678');
+              }}
+              className="font-bold text-amber-700 hover:text-amber-900 underline cursor-pointer"
+            >
+              {language === 'ar' ? 'دخول فوري بحساب أحمد حسام' : '1-Click Demo Login'}
             </button>
           </div>
         </div>
@@ -757,34 +944,149 @@ export const ReportWizard: React.FC = () => {
       </div>
 
       {/* Step 1: Citizen-Directed Report Nature & Quick Selection */}
+      {/* Step 1: Category & Report Type */}
       {step === 1 && (
         <div className="space-y-6 animate-in fade-in">
           <div className="space-y-1">
             <h2 className="text-lg sm:text-xl font-bold text-slate-900">
-              {language === 'ar' ? 'البلاغ ده عن إيه؟ (اكتب بنفسك مباشرة)' : 'What is your report about? (Write directly)'}
+              {language === 'ar' ? 'حدد نوع وطبيعة البلاغ' : 'Select Report Type'}
             </h2>
             <p className="text-xs text-slate-500">
               {language === 'ar'
-                ? 'مش محتاج تدور في قوائم طويلة.. اكتب باختصار الواقعة عن إيه أو اختر المقترح الأقرب.'
-                : 'No need to search through endless categories. Simply state what your report is about.'}
+                ? 'اختر ما إذا كان بلاغك حساساً وخاصاً (ابتزاز إلكتروني وتنمر) أو بلاغاً مدنياً عاماً لتوجيهه للجهة الصحيحة فوراً.'
+                : 'Choose whether this is a sensitive cyber extortion report or a general civic safety report.'}
             </p>
           </div>
 
-          {/* Direct Free-Text Input: What is the report about? */}
-          <div className="p-5 bg-gradient-to-br from-amber-500/10 via-amber-400/5 to-white border-2 border-amber-300 rounded-3xl space-y-3 shadow-xs">
-            <div className="flex items-center gap-2 text-slate-900 font-extrabold text-sm sm:text-base">
-              <Sparkles className="w-5 h-5 text-amber-600 shrink-0" />
-              <label htmlFor="customCategoryInput" className="cursor-pointer">
-                {language === 'ar' ? 'حدد بنفسك: البلاغ ده عن إيه بالضبط؟' : 'State in your own words: What happened?'} *
-              </label>
+          {/* Dedicated Choice 1: Sensitive Cyber Extortion & Bullying Card */}
+          <div
+            onClick={() => {
+              setCategoryId('cat_cyber_extortion');
+              if (!customCategory) {
+                setCustomCategory(language === 'ar' ? 'ابتزاز إلكتروني وتنمر رقمي' : 'Cyber Extortion & Online Bullying');
+              }
+              if (!title) {
+                setTitle(language === 'ar' ? 'تعرض لابتزاز إلكتروني وتهديد رقمي' : 'Cyber Extortion & Blackmail Complaint');
+              }
+              if (formErrors.category) {
+                setFormErrors((prev) => {
+                  const next = { ...prev };
+                  delete next.category;
+                  return next;
+                });
+              }
+            }}
+            className={`p-4 sm:p-5 rounded-3xl border-2 transition-all cursor-pointer space-y-3 shadow-md ${
+              categoryId === 'cat_cyber_extortion'
+                ? 'bg-gradient-to-br from-purple-950/90 via-slate-900 to-indigo-950/90 text-white border-purple-500 shadow-purple-500/20 ring-4 ring-purple-500/20'
+                : 'bg-white hover:bg-purple-50/60 border-purple-300 text-slate-900'
+            }`}
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className={`w-10 h-10 rounded-2xl flex items-center justify-center font-bold ${
+                  categoryId === 'cat_cyber_extortion' ? 'bg-purple-600 text-white' : 'bg-purple-100 text-purple-700'
+                }`}>
+                  <ShieldAlert className="w-5 h-5 text-rose-400 animate-pulse" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-sm sm:text-base font-extrabold">
+                      {language === 'ar' ? '🚨 بلاغ حساس: ابتزاز إلكتروني وتنمر رقمي' : '🚨 Sensitive Report: Cyber Extortion & Bullying'}
+                    </h3>
+                    <span className="text-[10px] bg-rose-500/20 text-rose-300 border border-rose-500/40 px-2 py-0.5 rounded-full font-bold">
+                      {language === 'ar' ? 'نوع خاص ومحمي' : 'Confidential'}
+                    </span>
+                  </div>
+                  <p className={`text-xs mt-0.5 ${categoryId === 'cat_cyber_extortion' ? 'text-purple-200' : 'text-slate-600'}`}>
+                    {language === 'ar'
+                      ? 'مخصص لأي شخص تعرض لابتزاز رقمي، تهديد بنشر صور أو فيديوهات، تشهير أو تنمر إلكتروني.'
+                      : 'For anyone facing digital blackmail, threat of leaking private media, defamation, or online bullying.'}
+                  </p>
+                </div>
+              </div>
+
+              <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0 ${
+                categoryId === 'cat_cyber_extortion' ? 'border-amber-400 bg-amber-400 text-slate-950' : 'border-slate-300'
+              }`}>
+                {categoryId === 'cat_cyber_extortion' && <Check className="w-4 h-4 stroke-[3]" />}
+              </div>
             </div>
-            <div className="relative">
+
+            {/* Exclusive Routing Guarantee Callout */}
+            <div className={`p-3 rounded-2xl text-xs space-y-1 ${
+              categoryId === 'cat_cyber_extortion' ? 'bg-purple-900/60 border border-purple-700/60 text-purple-100' : 'bg-purple-50 text-purple-900'
+            }`}>
+              <div className="font-extrabold flex items-center gap-1.5">
+                <Lock className="w-3.5 h-3.5 text-amber-300" />
+                <span>
+                  {language === 'ar'
+                    ? 'التحويل الحصري والآلي: إلى هيئة الاتصالات المصرية ومباحث الإنترنت فقط'
+                    : 'Exclusive Routing: Egyptian Telecom Authority & Cybercrime Police'}
+                </span>
+              </div>
+              <p className="text-[11px] leading-relaxed opacity-90">
+                {language === 'ar'
+                  ? '🔒 هذا البلاغ لا يذهب لأي جهة محلية أو حي على الإطلاق. يتم تشفيره وتوجيهه فورياً ومباشرة إلى الجهاز القومي لتنظيم الاتصالات ومباحث الإنترنت للتعامل الفوري وسرية الهوية التامة.'
+                  : '🔒 This report never goes to local branches. It is encrypted and dispatched directly to the Telecom Authority and Cybercrime Unit.'}
+              </p>
+            </div>
+          </div>
+
+          {/* Choice 2: General Civic Safety & Municipal Report Card */}
+          <div
+            onClick={() => {
+              if (categoryId === 'cat_cyber_extortion') {
+                setCategoryId('cat_traffic');
+              }
+            }}
+            className={`p-4 sm:p-5 rounded-3xl border-2 transition-all cursor-pointer space-y-3 shadow-xs ${
+              categoryId !== 'cat_cyber_extortion'
+                ? 'bg-gradient-to-br from-amber-500/10 via-amber-400/5 to-white border-amber-400 shadow-amber-500/10'
+                : 'bg-white hover:bg-slate-50 border-slate-200 text-slate-700'
+            }`}
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className={`w-10 h-10 rounded-2xl flex items-center justify-center font-bold ${
+                  categoryId !== 'cat_cyber_extortion' ? 'bg-amber-500 text-slate-950' : 'bg-slate-100 text-slate-600'
+                }`}>
+                  <Building className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm sm:text-base font-extrabold text-slate-900">
+                    {language === 'ar' ? '🏛️ بلاغ مدني أو سلامة عامة عام (طرق، مرافق، أمن، بيئة)' : '🏛️ General Civic & Public Safety Report'}
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    {language === 'ar'
+                      ? 'للبلاغات الميدانية مثل هبوط الطرق، انقطاع المرافق، أعمدة الإنارة، المخلفات، أو المخاطر العامة.'
+                      : 'For municipal reports such as potholes, broken utilities, open wiring, or municipal safety.'}
+                  </p>
+                </div>
+              </div>
+
+              <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0 ${
+                categoryId !== 'cat_cyber_extortion' ? 'border-amber-500 bg-amber-500 text-slate-950' : 'border-slate-300'
+              }`}>
+                {categoryId !== 'cat_cyber_extortion' && <Check className="w-4 h-4 stroke-[3]" />}
+              </div>
+            </div>
+
+            {/* Direct Free-Text Input */}
+            <div className="pt-2 border-t border-amber-200/60 space-y-2">
+              <label htmlFor="customCategoryInput" className="block text-xs font-bold text-slate-800">
+                {language === 'ar' ? 'اكتب باختصار البلاغ عن إيه:' : 'Describe the topic in your words:'}
+              </label>
               <input
                 id="customCategoryInput"
                 type="text"
                 value={customCategory}
                 onChange={(e) => {
                   setCustomCategory(e.target.value);
+                  const lower = e.target.value.toLowerCase();
+                  if (lower.includes('ابتزاز') || lower.includes('تنمر') || lower.includes('extortion') || lower.includes('cyber')) {
+                    setCategoryId('cat_cyber_extortion');
+                  }
                   if (formErrors.category) {
                     setFormErrors((prev) => {
                       const next = { ...prev };
@@ -794,19 +1096,13 @@ export const ReportWizard: React.FC = () => {
                   }
                 }}
                 placeholder={
-                  language === 'ar'
-                    ? 'مثال: ماس كهربائي في عمود إنارة، كسر ماسورة مياه، حفرة وهبوط في الشارع، تعدي على طريق...'
-                    : 'e.g., exposed electric wire, burst water pipe, road pothole...'
+                  categoryId === 'cat_cyber_extortion'
+                    ? language === 'ar' ? 'ابتزاز إلكتروني بنشر صور / تهديد عبر واتساب أو فيسبوك...' : 'Cyber extortion / blackmail...'
+                    : language === 'ar' ? 'مثال: ماس كهربائي في عمود، كسر ماسورة مياه، هبوط أرضي، حفرة في الطريق...' : 'e.g., exposed electric wire, broken water main...'
                 }
-                className="w-full px-4 py-3 text-sm bg-white border-2 border-amber-400/80 rounded-2xl focus:outline-none focus:ring-4 focus:ring-amber-500/20 font-bold text-slate-900 placeholder:font-normal placeholder:text-slate-400 shadow-inner"
+                className="w-full px-4 py-2.5 text-xs sm:text-sm bg-white border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 font-medium text-slate-900"
               />
             </div>
-
-            <p className="text-[11px] text-slate-500 pt-1 leading-relaxed">
-              {language === 'ar'
-                ? '💡 اكتب نوع وموضوع الواقعة بحرية تامة كما تراها (مثل: "عمود إنارة به ماس كهربائي"، "كسر ماسورة مياه وغرق الشارع"، "حفرة خطرة في الطريق"). لا حاجة للاختيار من أي قوائم معقدة.'
-                : '💡 Express the issue in your own words. No need to scroll through preset categories.'}
-            </p>
           </div>
 
           {formErrors.category && (
@@ -1108,6 +1404,21 @@ export const ReportWizard: React.FC = () => {
                 {language === 'ar'
                   ? 'تمت ترقية المنظومة لتستوعب مقاطع الفيديو عالية الدقة (MP4, MOV, MKV)، والتسجيلات الميدانية، والمستندات بحد أقصى 500 ميجابايت لكل ملف مع الحفاظ على التشفير التام.'
                   : 'You can attach full HD video files, field audio logs, and documents up to 500MB per file with end-to-end official confidentiality.'}
+              </p>
+            </div>
+          </div>
+
+          {/* Sensitive Media Privacy Notice */}
+          <div className="p-3.5 bg-blue-50/80 border border-blue-200 rounded-2xl flex items-start gap-2.5 text-xs text-blue-950">
+            <Lock className="w-4 h-4 text-blue-700 shrink-0 mt-0.5" />
+            <div className="space-y-0.5">
+              <span className="font-extrabold block">
+                {language === 'ar' ? 'حماية خصوصية الوسائط والمرفقات (الصور والفيديوهات):' : 'Privacy Protection for Photos & Videos:'}
+              </span>
+              <p className="text-[11px] text-slate-700 leading-relaxed">
+                {language === 'ar'
+                  ? 'أي صور أو مقاطع فيديو تقوم برفعها تُحفظ في الخزنة الجنائية المشفرة وتكون محجوبة عن الجهات الميدانية العادية، ومقتصرة على المشرف العام (الأدمن بانل) وهيئة الاتصالات فقط لحماية حرمة الحياة الخاصة وسرية ملفاتك.'
+                  : 'All uploaded media files are encrypted and restricted to Central Admin and the specialized Telecom Authority, hidden from regular field branches.'}
               </p>
             </div>
           </div>
